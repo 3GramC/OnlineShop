@@ -53,6 +53,18 @@ namespace OnlineShop.Api.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Categories");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Name = "Gaming"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Name = "Office"
+                        });
                 });
 
             modelBuilder.Entity("OnlineShop.Api.Domain.Entities.Order", b =>
@@ -136,7 +148,31 @@ namespace OnlineShop.Api.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CategoryId");
+
                     b.ToTable("Products");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            CategoryId = 1,
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Gaming laptop",
+                            Name = "ASUS ROG Strix G15",
+                            Price = 50000000m,
+                            StockQuantity = 5
+                        },
+                        new
+                        {
+                            Id = 2,
+                            CategoryId = 2,
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Business laptop",
+                            Name = "Lenovo ThinkPad X1",
+                            Price = 45000000m,
+                            StockQuantity = 3
+                        });
                 });
 
             modelBuilder.Entity("OnlineShop.Api.Domain.Entities.User", b =>
@@ -169,6 +205,22 @@ namespace OnlineShop.Api.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("OnlineShop.Api.Domain.Entities.Product", b =>
+                {
+                    b.HasOne("OnlineShop.Api.Domain.Entities.Category", "Category")
+                        .WithMany("Products")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Category");
+                });
+
+            modelBuilder.Entity("OnlineShop.Api.Domain.Entities.Category", b =>
+                {
+                    b.Navigation("Products");
                 });
 #pragma warning restore 612, 618
         }

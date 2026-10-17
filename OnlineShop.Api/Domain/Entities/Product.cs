@@ -10,5 +10,6 @@
         public string? ImageUrl { get; set; }
         public int CategoryId { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public Category Category { get; set; } = null!;
     }
 }
