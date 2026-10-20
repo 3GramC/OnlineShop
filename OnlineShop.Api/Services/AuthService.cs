@@ -3,15 +3,14 @@ using OnlineShop.Api.DTOs;
 using Microsoft.EntityFrameworkCore;
 using OnlineShop.Api.Domain.Entities;
 using OnlineShop.Api.Domain.Enums;
-
 namespace OnlineShop.Api.Services
 {
     public class AuthService : IAuthService
     {
-        public AppDbContext _db;
+        private readonly AppDbContext _db;
         public AuthService(AppDbContext db) => _db = db;
 
-        public async Task RegisterAsync(RegisterRequestDto request, CancellationToken ct)
+        public async Task RegisterAsync(RegisterRequestDto request, CancellationToken ct = default)
         {
             var existingUser = await _db.Users.FirstOrDefaultAsync(u => u.Email == request.Email, ct);
             if (existingUser != null)
@@ -29,6 +28,15 @@ namespace OnlineShop.Api.Services
 
             _db.Users.Add(user);
             await _db.SaveChangesAsync();
+        }
+        public async Task<User> LoginAsync(LoginRequestDto request, CancellationToken ct = default)
+        {
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == request.Email, ct);
+            if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+            {
+                throw new UnauthorizedAccessException("Invalid email or password.");
+            }
+            return user;
         }
     }
 }
