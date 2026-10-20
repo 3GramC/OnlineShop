@@ -1,9 +1,9 @@
 using OnlineShop.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using OnlineShop.Api.Services;
+using OnlineShop.Api.Domain.Enums;
 using OnlineShop.Api.DTOs;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 
@@ -13,11 +13,23 @@ builder.Services.AddOpenApi();
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<AppDbContext>(option => option.UseSqlite(connectionString));
+builder.Services.AddAuthorization();
 builder.Services.AddAuthentication("CookieAuth").AddCookie("CookieAuth", option =>
 {
     option.Cookie.Name = "OnlineShop.Auth";
     option.Cookie.HttpOnly = true;
     option.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+
+    option.Events.OnRedirectToLogin = context =>
+    {
+        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        return Task.CompletedTask;
+    };
+    option.Events.OnRedirectToAccessDenied = context =>
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        return Task.CompletedTask;
+    };
 });
 
 builder.Services.AddScoped<IProductService, ProductService>();
@@ -32,6 +44,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseAuthentication();
+app.UseAuthorization();
 
 
 app.MapGet("/api/v1/products", async (IProductService productService, CancellationToken ct) =>
@@ -39,6 +52,18 @@ app.MapGet("/api/v1/products", async (IProductService productService, Cancellati
     var products = await productService.GetAllAsync(ct);
     return Results.Ok(products);
 });
+app.MapGet("/api/v1/profile", (HttpContext httpContext) =>
+{
+    var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    var email = httpContext.User.FindFirst(ClaimTypes.Email)?.Value;
+    var fullName = httpContext.User.FindFirst(ClaimTypes.Name)?.Value;
+
+    return Results.Ok(new { userId, email, fullName });
+}).RequireAuthorization();
+app.MapGet("/api/v1/admin/dashboard", () =>
+{
+    return Results.Ok(new { Message = "Welcome, Admin!" });
+}).RequireAuthorization(policy => policy.RequireRole(nameof(UserRole.Admin)));
 app.MapPost("/api/v1/auth/register", async ([FromBody] RegisterRequestDto request, IAuthService authService, CancellationToken ct) =>
 {
     try
