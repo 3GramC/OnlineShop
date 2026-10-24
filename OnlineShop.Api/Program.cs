@@ -34,6 +34,7 @@ builder.Services.AddAuthentication("CookieAuth").AddCookie("CookieAuth", option 
 
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<ICartService, CartService>();
 
 var app =  builder.Build();
 
@@ -52,6 +53,7 @@ app.MapGet("/api/v1/products", async (IProductService productService, Cancellati
     var products = await productService.GetAllAsync(ct);
     return Results.Ok(products);
 });
+
 app.MapGet("/api/v1/profile", (HttpContext httpContext) =>
 {
     var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -60,10 +62,12 @@ app.MapGet("/api/v1/profile", (HttpContext httpContext) =>
 
     return Results.Ok(new { userId, email, fullName });
 }).RequireAuthorization();
+
 app.MapGet("/api/v1/admin/dashboard", () =>
 {
     return Results.Ok(new { Message = "Welcome, Admin!" });
 }).RequireAuthorization(policy => policy.RequireRole(nameof(UserRole.Admin)));
+
 app.MapPost("/api/v1/auth/register", async ([FromBody] RegisterRequestDto request, IAuthService authService, CancellationToken ct) =>
 {
     try
@@ -76,6 +80,7 @@ app.MapPost("/api/v1/auth/register", async ([FromBody] RegisterRequestDto reques
         return Results.BadRequest(new { error = ex.Message });
     }
 });
+
 app.MapPost("/api/v1/auth/login", async ([FromBody] LoginRequestDto request, IAuthService AuthService,
     HttpContext httpContext, CancellationToken ct) =>
 {
@@ -99,5 +104,52 @@ app.MapPost("/api/v1/auth/login", async ([FromBody] LoginRequestDto request, IAu
         return Results.Unauthorized();
     }
 });
+
+app.MapGet("/api/v1/cart", async (ICartService cartService, HttpContext httpContext, CancellationToken ct) =>
+{
+    var userIdString = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    if (!int.TryParse(userIdString, out var userId))
+    {
+        return Results.Unauthorized();
+    }
+    var cart = await cartService.GetCartAsync(userId, ct);
+    return Results.Ok(cart);
+}).RequireAuthorization();
+
+app.MapPost("/api/v1/cart/items", async (AddToCartRequestDto request,ICartService cartService, HttpContext httpContext, CancellationToken ct) =>
+{
+    var userIdString = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    if(!int.TryParse(userIdString, out var userId))
+    {
+        return Results.Unauthorized();
+    }
+    try
+    {
+        await cartService.AddToCartAsync(userId, request, ct);
+        return Results.Ok(new { Message = "Item added to cart successfully" });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new {error = ex.Message});
+    }
+}).RequireAuthorization();
+
+app.MapDelete("/api/v1/cart/items/{cartItemId}", async (int cartItemId, ICartService cartService, HttpContext httpContext, CancellationToken ct) =>
+{
+    var userIdString = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    if (!int.TryParse (userIdString, out var userId))
+    {
+        return Results.Unauthorized();
+    }
+    try
+    {
+        await cartService.RemoveFromCartAsync(userId, cartItemId, ct);
+        return Results.Ok(new {Message = "Item removed from cart." });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new {error = ex.Message});
+    }
+}).RequireAuthorization();
 
 app.Run();
