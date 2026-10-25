@@ -35,6 +35,7 @@ builder.Services.AddAuthentication("CookieAuth").AddCookie("CookieAuth", option 
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ICartService, CartService>();
+builder.Services.AddScoped<IOrderService, OrderService>();
 
 var app =  builder.Build();
 
@@ -150,6 +151,35 @@ app.MapDelete("/api/v1/cart/items/{cartItemId}", async (int cartItemId, ICartSer
     {
         return Results.BadRequest(new {error = ex.Message});
     }
+}).RequireAuthorization();
+
+app.MapPost("/api/v1/orders", async ([FromBody] CreateOrderRequestDto request, HttpContext httpContext, IOrderService orderService, CancellationToken ct) =>
+{
+    var userIdString = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    if (!int.TryParse(userIdString, out var userId))
+    {
+        return Results.Unauthorized();
+    }
+    try
+    {
+        var orderId = await orderService.CreateOrderAsync(userId,request, ct);
+        return Results.Ok(new { Message = "Order Created successfully", OrderId = orderId });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+}).RequireAuthorization();
+
+app.MapGet("api/v1/orders", async (IOrderService orderService, HttpContext httpContext, CancellationToken ct) =>
+{
+    var userIdString = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    if (!int.TryParse(userIdString, out var userId))
+    {
+        return Results.Unauthorized();
+    }
+    var orders =await orderService.GetUserOrdersAsync(userId, ct);
+    return Results.Ok(orders);
 }).RequireAuthorization();
 
 app.Run();

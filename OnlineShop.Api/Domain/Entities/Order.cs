@@ -10,5 +10,6 @@ namespace OnlineShop.Api.Domain.Entities
         public decimal TotalAmount { get; set; }
         public OrderStatus Status { get; set; } = OrderStatus.Pending;
         public string ShippingAddress { get; set; } = string.Empty;
+        public List<OrderItem> Items { get; set;} = new ();
     }
 }
