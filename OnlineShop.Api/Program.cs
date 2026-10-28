@@ -48,7 +48,17 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
-
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var adminEmail = builder.Configuration["AdminSettings:Email"];
+    var adminPassword = builder.Configuration["AdminSettings:Password"];
+    if (string.IsNullOrEmpty(adminEmail) || string.IsNullOrEmpty(adminPassword))
+    {
+        throw new InvalidOperationException("Admin credentials are not configured.");
+    }
+    await AdminSeeder.SeedAdminAsync(db, adminEmail, adminPassword, CancellationToken.None);
+}
 app.MapGet("/api/v1/products", async (IProductService productService, CancellationToken ct) =>
 {
     var products = await productService.GetAllAsync(ct);
@@ -78,7 +88,7 @@ app.MapPost("/api/v1/auth/register", async ([FromBody] RegisterRequestDto reques
     }
     catch (InvalidOperationException ex)
     {
-        return Results.BadRequest(new { error = ex.Message });
+        return Results.BadRequest(new { Error = ex.Message });
     }
 });
 
@@ -131,7 +141,7 @@ app.MapPost("/api/v1/cart/items", async (AddToCartRequestDto request,ICartServic
     }
     catch (InvalidOperationException ex)
     {
-        return Results.BadRequest(new {error = ex.Message});
+        return Results.BadRequest(new {Error = ex.Message});
     }
 }).RequireAuthorization();
 
@@ -149,7 +159,7 @@ app.MapDelete("/api/v1/cart/items/{cartItemId}", async (int cartItemId, ICartSer
     }
     catch (InvalidOperationException ex)
     {
-        return Results.BadRequest(new {error = ex.Message});
+        return Results.BadRequest(new {Error = ex.Message});
     }
 }).RequireAuthorization();
 
@@ -167,7 +177,7 @@ app.MapPost("/api/v1/orders", async ([FromBody] CreateOrderRequestDto request, H
     }
     catch (InvalidOperationException ex)
     {
-        return Results.BadRequest(new { error = ex.Message });
+        return Results.BadRequest(new { Error = ex.Message });
     }
 }).RequireAuthorization();
 
@@ -181,5 +191,44 @@ app.MapGet("api/v1/orders", async (IOrderService orderService, HttpContext httpC
     var orders =await orderService.GetUserOrdersAsync(userId, ct);
     return Results.Ok(orders);
 }).RequireAuthorization();
+
+app.MapPost("api/v1/admin/products", async ([FromBody] CreateProductRequestDto request, IProductService productService, CancellationToken ct = default) =>
+{
+    try
+    {
+        var productId = await productService.CreateProductAsync(request, ct);
+        return Results.Ok(new { Message = "Product created successfully", ProductId = productId });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { Error = ex.Message });
+    }
+}).RequireAuthorization(policy => policy.RequireRole(nameof(UserRole.Admin)));
+
+app.MapPut("api/v1/admin/products/{id}", async (int id ,[FromBody] UpdateProductRequestDto request, IProductService productService, CancellationToken ct ) =>
+{
+    try
+    {
+        await productService.UpdateProductAsync(id, request, ct);
+        return Results.Ok(new { Message = "Product updated successfully" });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { Error = ex.Message }); 
+    }
+}).RequireAuthorization(policy => policy.RequireRole(nameof(UserRole.Admin)));
+
+app.MapDelete("api/v1/admin/products/{id}", async (int id, IProductService productService, CancellationToken ct) =>
+{
+    try
+    {
+        await productService.DeleteProductAsync(id, ct);
+        return Results.Ok(new { Message = "Product deleted successfully" });
+    }
+    catch(InvalidOperationException ex)
+    {
+        return Results.BadRequest(new {Error = ex.Message});
+    }
+}).RequireAuthorization(policy => policy.RequireRole(nameof(UserRole.Admin)));
 
 app.Run();
