@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using OnlineShop.Api.Exceptions;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -45,6 +46,7 @@ var app =  builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapScalarApiReference();
 }
 
 app.UseExceptionHandler();
@@ -87,7 +89,7 @@ app.MapPost("/api/v1/auth/register", async ([FromBody] RegisterRequestDto reques
 {
     await authService.RegisterAsync(request, ct);
     return Results.Ok(new { Message = "User registered Successfully" });
-});
+}).WithParameterValidation();
 
 app.MapPost("/api/v1/auth/login", async ([FromBody] LoginRequestDto request, IAuthService AuthService,
     HttpContext httpContext, CancellationToken ct) =>
@@ -104,7 +106,7 @@ app.MapPost("/api/v1/auth/login", async ([FromBody] LoginRequestDto request, IAu
     var claimsPrincipal = new ClaimsPrincipal(claimsIdentity);
     await httpContext.SignInAsync("CookieAuth", claimsPrincipal);
     return Results.Ok(new { Message = "Login Successfully" });
-});
+}).WithParameterValidation();
 
 app.MapGet("/api/v1/cart", async (ICartService cartService, HttpContext httpContext, CancellationToken ct) =>
 {
@@ -126,7 +128,7 @@ app.MapPost("/api/v1/cart/items", async (AddToCartRequestDto request,ICartServic
     }
     await cartService.AddToCartAsync(userId, request, ct);
     return Results.Ok(new { Message = "Item added to cart successfully" });
-}).RequireAuthorization();
+}).RequireAuthorization().WithParameterValidation();
 
 app.MapDelete("/api/v1/cart/items/{cartItemId}", async (int cartItemId, ICartService cartService, HttpContext httpContext, CancellationToken ct) =>
 {
@@ -148,7 +150,7 @@ app.MapPost("/api/v1/orders", async ([FromBody] CreateOrderRequestDto request, H
     }
     var orderId = await orderService.CreateOrderAsync(userId,request, ct);
     return Results.Ok(new { Message = "Order Created successfully", OrderId = orderId });
-}).RequireAuthorization();
+}).RequireAuthorization().WithParameterValidation();
 
 app.MapGet("api/v1/orders", async (IOrderService orderService, HttpContext httpContext, CancellationToken ct) =>
 {
@@ -165,18 +167,18 @@ app.MapPost("api/v1/admin/products", async ([FromBody] CreateProductRequestDto r
 {
     var productId = await productService.CreateProductAsync(request, ct);
     return Results.Ok(new { Message = "Product created successfully", ProductId = productId });
-}).RequireAuthorization(policy => policy.RequireRole(nameof(UserRole.Admin)));
+}).RequireAuthorization(policy => policy.RequireRole(nameof(UserRole.Admin))).WithParameterValidation();
 
 app.MapPut("api/v1/admin/products/{id}", async (int id ,[FromBody] UpdateProductRequestDto request, IProductService productService, CancellationToken ct ) =>
 {
     await productService.UpdateProductAsync(id, request, ct);
     return Results.Ok(new { Message = "Product updated successfully" });
-}).RequireAuthorization(policy => policy.RequireRole(nameof(UserRole.Admin)));
+}).RequireAuthorization(policy => policy.RequireRole(nameof(UserRole.Admin))).WithParameterValidation();
 
 app.MapDelete("api/v1/admin/products/{id}", async (int id, IProductService productService, CancellationToken ct) =>
 {
     await productService.DeleteProductAsync(id, ct);
     return Results.Ok(new { Message = "Product deleted successfully" });
-}).RequireAuthorization(policy => policy.RequireRole(nameof(UserRole.Admin)));
+}).RequireAuthorization(policy => policy.RequireRole(nameof(UserRole.Admin))).WithParameterValidation();
 
 app.Run();
